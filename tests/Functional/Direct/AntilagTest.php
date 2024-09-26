@@ -11,19 +11,19 @@
 
 declare(strict_types=1);
 
-namespace Nytris\Antilag\Tests\Functional;
+namespace Nytris\Antilag\Tests\Functional\Direct;
 
 use Mockery\MockInterface;
 use Nytris\Antilag\Antilag;
 use Nytris\Antilag\StorageInterface;
-use Nytris\Antilag\Tests\AbstractTestCase;
+use Nytris\Antilag\Tests\Functional\AbstractFunctionalTestCase;
 
 /**
  * Class AntilagTest.
  *
  * @author Dan Phillimore <dan@ovms.co>
  */
-class AntilagTest extends AbstractTestCase
+class AntilagTest extends AbstractFunctionalTestCase
 {
     private MockInterface&StorageInterface $storage;
 
@@ -40,33 +40,22 @@ class AntilagTest extends AbstractTestCase
 
     public function tearDown(): void
     {
-        if (Antilag::isOn()) {
-            Antilag::turnOff();
-        }
+        Antilag::stage3();
     }
 
-    public function testTurnOffClearsInMemoryStatCache(): void
+    public function testStage1LoadsStatCacheWhenSupported(): void
     {
-        Antilag::turnOn($this->storage);
-
-        Antilag::turnOff();
-
-        static::assertEquals([], Antilag::$statCache);
-    }
-
-    public function testTurnOnLoadsStatCacheWhenSupported(): void
-    {
-        Antilag::turnOn($this->storage);
+        Antilag::stage1($this->storage);
 
         static::assertEquals(
             [
                 '/my/first/path' => ['size' => 1234],
             ],
-            Antilag::$statCache
+            Antilag::getStatCache()
         );
     }
 
-    public function testTurnOnDoesNotLoadStatCacheWhenNotSupported(): void
+    public function testStage1DoesNotLoadStatCacheWhenNotSupported(): void
     {
         $this->storage->allows()
             ->isSupported()
@@ -76,29 +65,19 @@ class AntilagTest extends AbstractTestCase
             ->fetchStatCache()
             ->never();
 
-        Antilag::turnOn($this->storage);
+        Antilag::stage1($this->storage);
 
-        static::assertEquals([], Antilag::$statCache);
+        static::assertEquals([], Antilag::getStatCache());
     }
 
-    public function testCachedStatIsReturnedForStreamWrapperUrlStat(): void
-    {
-        Antilag::turnOn($this->storage);
-
-        $stat = stat('/my/first/path');
-
-        static::assertEquals(1234, $stat['size']);
-        static::assertEquals(1234, $stat[7]);
-    }
-
-    public function testCachedStatIsReturnedForStreamWrapperStreamStat(): void
+    public function testCachedStatIsReturnedForStage1StreamWrapperStreamStat(): void
     {
         $this->storage->allows()
             ->fetchStatCache()
             ->andReturn([
                 __FILE__ => ['size' => 4321],
             ]);
-        Antilag::turnOn($this->storage);
+        Antilag::stage1($this->storage);
 
         $stream = fopen(__FILE__, 'rb');
         $stat = fstat($stream);
@@ -107,10 +86,29 @@ class AntilagTest extends AbstractTestCase
         static::assertEquals(4321, $stat[7]);
     }
 
-    public function testTurnOffStoresNewlyCachedStatsFromStreamWrapperUrlStat(): void
+    public function testCachedStatIsReturnedForStage1StreamWrapperUrlStat(): void
     {
-        Antilag::turnOn($this->storage);
-        $stat = stat(__FILE__);
+        Antilag::stage1($this->storage);
+
+        $stat = stat('/my/first/path');
+
+        static::assertEquals(1234, $stat['size']);
+        static::assertEquals(1234, $stat[7]);
+    }
+
+    public function testStage3ClearsInMemoryStatCache(): void
+    {
+        Antilag::stage1($this->storage);
+
+        Antilag::stage3();
+
+        static::assertEquals([], Antilag::getStatCache());
+    }
+
+    public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperStreamStat(): void
+    {
+        Antilag::stage1($this->storage);
+        $stream = fopen(__FILE__, 'rb');
 
         $this->storage->expects('saveStatCache')
             ->once()
@@ -120,16 +118,15 @@ class AntilagTest extends AbstractTestCase
                 static::assertSame((int) filesize(__FILE__), $stat['size']);
             });
 
-        Antilag::turnOff();
+        $stat = fstat($stream);
+        Antilag::stage3();
 
         static::assertIsArray($stat);
     }
 
-    public function testTurnOffStoresNewlyCachedStatsFromStreamWrapperStreamStat(): void
+    public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperUrlStat(): void
     {
-        Antilag::turnOn($this->storage);
-        $stream = fopen(__FILE__, 'rb');
-        $stat = fstat($stream);
+        Antilag::stage1($this->storage);
 
         $this->storage->expects('saveStatCache')
             ->once()
@@ -139,7 +136,8 @@ class AntilagTest extends AbstractTestCase
                 static::assertSame((int) filesize(__FILE__), $stat['size']);
             });
 
-        Antilag::turnOff();
+        $stat = stat(__FILE__);
+        Antilag::stage3();
 
         static::assertIsArray($stat);
     }

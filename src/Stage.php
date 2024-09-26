@@ -13,19 +13,16 @@ declare(strict_types=1);
 
 namespace Nytris\Antilag;
 
-use Nytris\Core\Package\PackageInterface;
-
 /**
- * Interface AntilagPackageInterface.
+ * Enum Stage.
  *
- * Configures the installation of Nytris Antilag.
+ * Defines the multiple stages of Antilag setup.
  *
  * @author Dan Phillimore <dan@ovms.co>
  */
-interface AntilagPackageInterface extends PackageInterface
+enum Stage
 {
-    /**
-     * Fetches which stage of Antilag setup to perform.
-     */
-    public function getStage(): Stage;
+    case STAGE_1;
+    case STAGE_2;
+    case STAGE_3;
 }

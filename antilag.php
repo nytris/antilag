@@ -155,7 +155,7 @@ class StreamWrapper
             return false;
         }
 
-        $stat = Antilag::$statCache[$this->path] ?? null;
+        $stat = Antilag::getCachedStat($this->path);
 
         if ($stat !== null) {
             return $stat;
@@ -163,7 +163,7 @@ class StreamWrapper
 
         $stat = fstat($this->wrappedResource);
 
-        Antilag::$statCache[$this->path] = $stat;
+        Antilag::cacheStat($this->path, $stat);
 
         return $stat;
     }
@@ -231,7 +231,7 @@ class StreamWrapper
      */
     public function url_stat(string $path, int $flags): array|false
     {
-        $stat = Antilag::$statCache[$path] ?? null;
+        $stat = Antilag::getCachedStat($path);
 
         if ($stat !== null) {
             return $stat;
@@ -275,7 +275,7 @@ class StreamWrapper
                 $doStat
         );
 
-        Antilag::$statCache[$path] = $stat;
+        Antilag::cacheStat($path, $stat);
 
         return $stat;
     }
@@ -347,10 +347,44 @@ class Antilag
 {
     private static bool $isOn = false;
     /**
-     * @var array<string, array<mixed>>
+     * @var array<string, array<mixed>|false>
      */
-    public static array $statCache = [];
+    private static array $statCache = [];
+    private static bool $statCacheIsDirty = false;
     private static StorageInterface $storage;
+
+    /**
+     * Adds a path to the stat cache.
+     *
+     * @param string $path
+     * @param array<mixed>|false $stat
+     */
+    public static function cacheStat(string $path, array|false $stat): void
+    {
+        self::$statCache[$path] = $stat;
+        self::$statCacheIsDirty = true;
+    }
+
+    /**
+     * Fetches a stat from the stat cache.
+     *
+     * @param string $path
+     * @return array<mixed>|false|null Returns array on success, false when cached as non-accessible or null on miss.
+     */
+    public static function getCachedStat(string $path): array|false|null
+    {
+        return self::$statCache[$path] ?? null;
+    }
+
+    /**
+     * Fetches the in-memory contents of the stat cache.
+     *
+     * @return array<string, array<mixed>|false>
+     */
+    public static function getStatCache(): array
+    {
+        return self::$statCache;
+    }
 
     /**
      * Fetches whether antilag is currently on.
@@ -361,28 +395,9 @@ class Antilag
     }
 
     /**
-     * Turns off antilag.
-     */
-    public static function turnOff(): void
-    {
-        if (!self::$isOn) {
-            throw new LogicException('Nytris Antilag is not turned on');
-        }
-
-        if (!ShiftStreamWrapper::isRegistered()) {
-            @stream_wrapper_restore('file');
-        }
-
-        self::$storage->saveStatCache(self::$statCache);
-        self::$statCache = [];
-
-        self::$isOn = false;
-    }
-
-    /**
      * Turns on antilag.
      */
-    public static function turnOn(
+    public static function stage1(
         StorageInterface $storage = new ApcuStorage()
     ): void {
         if (!$storage->isSupported()) {
@@ -404,5 +419,28 @@ class Antilag
         StreamWrapper::register();
 
         self::$isOn = true;
+    }
+
+    /**
+     * Turns off antilag.
+     */
+    public static function stage3(): void
+    {
+        if (!self::$isOn) {
+            return;
+        }
+
+        if (!ShiftStreamWrapper::isRegistered()) {
+            @stream_wrapper_restore('file');
+        }
+
+        if (self::$statCacheIsDirty) {
+            self::$storage->saveStatCache(self::$statCache);
+            self::$statCacheIsDirty = false;
+        }
+
+        self::$statCache = [];
+
+        self::$isOn = false;
     }
 }

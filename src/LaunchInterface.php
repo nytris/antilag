@@ -25,12 +25,13 @@ use Nytris\Core\Package\PackageFacadeInterface;
 interface LaunchInterface extends PackageFacadeInterface
 {
     /**
-     * Turns off antilag.
+     * Moves to the second stage of Antilag, which switches from its own stream wrapper to PHP Code Shift's.
      */
-    public static function turnOff(): void;
+    public static function stage2(): void;
 
     /**
-     * Turns on antilag.
+     * Moves to the third stage of Antilag, which unregisters Antilag's stat caching
+     * in favour of another more capable stream wrapper-based cache, such as Nytris Boost.
      */
-    public static function turnOn(): void;
+    public static function stage3(): void;
 }

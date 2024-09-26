@@ -12,9 +12,7 @@ Install this package with Composer:
 $ composer require nytris/antilag
 ```
 
-### When using Nytris platform (recommended)
-
-Configure Nytris platform:
+### Configure Nytris platform:
 
 `nytris.config.php`
 
@@ -24,13 +22,41 @@ Configure Nytris platform:
 declare(strict_types=1);
 
 use Nytris\Antilag\AntilagPackage;
+use Nytris\Antilag\Stage;
 use Nytris\Boot\BootConfig;
 use Nytris\Boot\PlatformConfig;
-use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 
 $bootConfig = new BootConfig(new PlatformConfig(__DIR__ . '/var/cache/nytris/'));
 
-$bootConfig->installPackage(new AntilagPackage());
+$bootConfig->installPackage(new AntilagPackage(stage: Stage::STAGE_2));
+
+// (Other Nytris packages, Nytris Boost is recommended...)
+
+$bootConfig->installPackage(new AntilagPackage(stage: Stage::STAGE_3));
 
 return $bootConfig;
 ```
+
+### Invoke Stage 1 as early as possible
+
+e.g. from a front controller:
+
+`app.php`
+```php
+<?php
+
+if (getenv('ENABLE_NYTRIS_ANTILAG') !== 'no') {
+    require dirname(__DIR__) . '/vendor/nytris/antilag/antilag.php';
+    Antilag::stage1();
+}
+
+// Using Symfony as an example:
+$kernel = new Kernel($_SERVER['APP_ENV'], (bool) $_SERVER['APP_DEBUG']);
+// ...
+```
+
+## See also
+
+- [Nytris Boost][Nytris Boost]
+
+[Nytris Boost]: https://github.com/nytris/boost

@@ -22,11 +22,24 @@ namespace Nytris\Antilag;
  */
 class AntilagPackage implements AntilagPackageInterface
 {
+    public function __construct(
+        private readonly Stage $stage
+    ) {
+    }
+
     /**
      * @inheritDoc
      */
     public function getPackageFacadeFqcn(): string
     {
         return Launch::class;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getStage(): Stage
+    {
+        return $this->stage;
     }
 }

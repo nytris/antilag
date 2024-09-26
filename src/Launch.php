@@ -13,6 +13,12 @@ declare(strict_types=1);
 
 namespace Nytris\Antilag;
 
+use Asmblah\PhpCodeShift\CodeShift;
+use Asmblah\PhpCodeShift\Shifter\Stream\Native\StreamWrapper as ShiftStreamWrapper;
+use Asmblah\PhpCodeShift\Shifter\Stream\StreamWrapperManager;
+use InvalidArgumentException;
+use LogicException;
+use Nytris\Antilag\Stage2\StreamHandler;
 use Nytris\Core\Package\PackageContextInterface;
 use Nytris\Core\Package\PackageInterface;
 
@@ -48,8 +54,25 @@ class Launch implements LaunchInterface
      */
     public static function install(PackageContextInterface $packageContext, PackageInterface $package): void
     {
-        // Another more capable stream wrapper-based cache may now take over, such as Nytris Boost.
-        Antilag::turnOff();
+        if (!$package instanceof AntilagPackageInterface) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Package config must be a %s but it was a %s',
+                    AntilagPackageInterface::class,
+                    $package::class
+                )
+            );
+        }
+
+        if ($package->getStage() === Stage::STAGE_1) {
+            throw new LogicException('Stage 1 should be invoked using Antilag::stage1()');
+        }
+
+        if ($package->getStage() === Stage::STAGE_2) {
+            self::stage2();
+        } elseif ($package->getStage() === Stage::STAGE_3) {
+            self::stage3();
+        }
 
         self::$isInstalled = true;
     }
@@ -65,17 +88,28 @@ class Launch implements LaunchInterface
     /**
      * @inheritDoc
      */
-    public static function turnOff(): void
+    public static function stage2(): void
     {
-        Antilag::turnOff();
+        // Note: the order is important here to ensure stats for all relevant class module files are cached.
+        $codeShift = new CodeShift();
+
+        $originalStreamHandler = StreamWrapperManager::getStreamHandler();
+        $cachingStreamHandler = new StreamHandler($originalStreamHandler);
+        StreamWrapperManager::setStreamHandler($cachingStreamHandler);
+
+        if (!ShiftStreamWrapper::isRegistered()) {
+            @stream_wrapper_restore('file');
+        }
+
+        $codeShift->install();
     }
 
     /**
      * @inheritDoc
      */
-    public static function turnOn(): void
+    public static function stage3(): void
     {
-        Antilag::turnOn();
+        Antilag::stage3();
     }
 
     /**
@@ -83,6 +117,7 @@ class Launch implements LaunchInterface
      */
     public static function uninstall(): void
     {
+        Antilag::stage3();
         self::$isInstalled = false;
     }
 }
