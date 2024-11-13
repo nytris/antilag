@@ -14,11 +14,13 @@ declare(strict_types=1);
 namespace Nytris\Antilag;
 
 use Asmblah\PhpCodeShift\CodeShift;
+use Asmblah\PhpCodeShift\Shifter\Stream\Handler\Registration\RegistrationInterface;
 use Asmblah\PhpCodeShift\Shifter\Stream\Native\StreamWrapper as ShiftStreamWrapper;
 use Asmblah\PhpCodeShift\Shifter\Stream\StreamWrapperManager;
 use InvalidArgumentException;
 use LogicException;
 use Nytris\Antilag\Stage2\StreamHandler;
+use Nytris\Antilag\Stage2\StreamHandlerRegistrant;
 use Nytris\Core\Package\PackageContextInterface;
 use Nytris\Core\Package\PackageInterface;
 
@@ -32,6 +34,10 @@ use Nytris\Core\Package\PackageInterface;
 class Launch implements LaunchInterface
 {
     private static bool $isInstalled = false;
+    /**
+     * @var RegistrationInterface<StreamHandler>|null
+     */
+    private static ?RegistrationInterface $streamHandlerRegistration = null;
 
     /**
      * @inheritDoc
@@ -93,9 +99,9 @@ class Launch implements LaunchInterface
         // Note: the order is important here to ensure stats for all relevant class module files are cached.
         $codeShift = new CodeShift();
 
-        $originalStreamHandler = StreamWrapperManager::getStreamHandler();
-        $cachingStreamHandler = new StreamHandler($originalStreamHandler);
-        StreamWrapperManager::setStreamHandler($cachingStreamHandler);
+        self::$streamHandlerRegistration = StreamWrapperManager::registerStreamHandler(
+            new StreamHandlerRegistrant()
+        );
 
         if (!ShiftStreamWrapper::isRegistered()) {
             @stream_wrapper_restore('file');
@@ -109,6 +115,9 @@ class Launch implements LaunchInterface
      */
     public static function stage3(): void
     {
+        self::$streamHandlerRegistration?->unregister();
+        self::$streamHandlerRegistration = null;
+
         Antilag::stage3();
     }
 
@@ -117,7 +126,8 @@ class Launch implements LaunchInterface
      */
     public static function uninstall(): void
     {
-        Antilag::stage3();
+        self::stage3();
+
         self::$isInstalled = false;
     }
 }
