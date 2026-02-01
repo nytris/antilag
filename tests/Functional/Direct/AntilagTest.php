@@ -15,8 +15,9 @@ namespace Nytris\Antilag\Tests\Functional\Direct;
 
 use Mockery\MockInterface;
 use Nytris\Antilag\Antilag;
-use Nytris\Antilag\StorageInterface;
 use Nytris\Antilag\Tests\Functional\AbstractFunctionalTestCase;
+use Nytris\Ignition\Ignition;
+use Nytris\Ignition\Storage\StorageInterface;
 
 /**
  * Class AntilagTest.
@@ -41,43 +42,52 @@ class AntilagTest extends AbstractFunctionalTestCase
     public function tearDown(): void
     {
         Antilag::stage3();
+        Ignition::switchOff();
     }
 
-    public function testStage1LoadsStatCacheWhenSupported(): void
+    public function testStage1PreservesStatCacheWhenSupported(): void
     {
-        Antilag::stage1($this->storage);
-
-        static::assertEquals(
-            [
-                '/my/first/path' => ['size' => 1234],
-            ],
-            Antilag::getStatCache()
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
         );
+
+        Antilag::stage1();
+
+        static::assertEquals(['size' => 1234], Ignition::getStatCache()['/my/first/path']);
     }
 
-    public function testStage1DoesNotLoadStatCacheWhenNotSupported(): void
+    public function testStage1DoesNotAffectStatCacheWhenNotSupported(): void
     {
         $this->storage->allows()
             ->isSupported()
             ->andReturnFalse();
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
 
         $this->storage->expects()
             ->fetchStatCache()
             ->never();
 
-        Antilag::stage1($this->storage);
+        Antilag::stage1();
 
-        static::assertEquals([], Antilag::getStatCache());
+        static::assertFalse(Ignition::isChokeOn());
     }
 
-    public function testCachedStatIsReturnedForStage1StreamWrapperStreamStat(): void
+    public function testCachedStatIsReturnedForIgnitionStreamWrapperStreamStat(): void
     {
         $this->storage->allows()
             ->fetchStatCache()
             ->andReturn([
                 __FILE__ => ['size' => 4321],
             ]);
-        Antilag::stage1($this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
 
         $stream = fopen(__FILE__, 'rb');
         $stat = fstat($stream);
@@ -86,9 +96,13 @@ class AntilagTest extends AbstractFunctionalTestCase
         static::assertEquals(4321, $stat[7]);
     }
 
-    public function testCachedStatIsReturnedForStage1StreamWrapperUrlStat(): void
+    public function testCachedStatIsReturnedForIgnitionStreamWrapperUrlStat(): void
     {
-        Antilag::stage1($this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
 
         $stat = stat('/my/first/path');
 
@@ -96,18 +110,26 @@ class AntilagTest extends AbstractFunctionalTestCase
         static::assertEquals(1234, $stat[7]);
     }
 
-    public function testStage3ClearsInMemoryStatCache(): void
+    public function testStage3DisablesStatCache(): void
     {
-        Antilag::stage1($this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
 
         Antilag::stage3();
 
-        static::assertEquals([], Antilag::getStatCache());
+        static::assertFalse(Ignition::isChokeOn());
     }
 
-    public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperStreamStat(): void
+    public function testStage3StoresNewlyCachedStatsFromIgnitionStreamWrapperStreamStat(): void
     {
-        Antilag::stage1($this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
         $stream = fopen(__FILE__, 'rb');
 
         $this->storage->expects('saveStatCache')
@@ -124,9 +146,13 @@ class AntilagTest extends AbstractFunctionalTestCase
         static::assertIsArray($stat);
     }
 
-    public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperUrlStat(): void
+    public function testStage3StoresNewlyCachedStatsFromIgnitionStreamWrapperUrlStat(): void
     {
-        Antilag::stage1($this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
 
         $this->storage->expects('saveStatCache')
             ->once()

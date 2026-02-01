@@ -6,5 +6,4 @@ parameters:
     paths:
         - src/
         - tests/
-        - antilag.php
     tmpDir: var/phpstan/

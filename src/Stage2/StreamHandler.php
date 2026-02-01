@@ -15,7 +15,7 @@ namespace Nytris\Antilag\Stage2;
 
 use Asmblah\PhpCodeShift\Shifter\Stream\Handler\AbstractStreamHandlerDecorator;
 use Asmblah\PhpCodeShift\Shifter\Stream\Native\StreamWrapperInterface;
-use Nytris\Antilag\Antilag;
+use Nytris\Ignition\Ignition;
 
 /**
  * Class StreamHandler.
@@ -31,7 +31,11 @@ class StreamHandler extends AbstractStreamHandlerDecorator
      */
     public function streamStat(StreamWrapperInterface $streamWrapper): array|false
     {
-        $stat = Antilag::getCachedStat($streamWrapper->getOpenPath());
+        if (!Ignition::isChokeOn()) {
+            return parent::streamStat($streamWrapper);
+        }
+
+        $stat = Ignition::getCachedStat($streamWrapper->getOpenPath());
 
         if ($stat !== null) {
             return $stat;
@@ -39,7 +43,7 @@ class StreamHandler extends AbstractStreamHandlerDecorator
 
         $stat = parent::streamStat($streamWrapper);
 
-        Antilag::cacheStat($streamWrapper->getOpenPath(), $stat);
+        Ignition::cacheStat($streamWrapper->getOpenPath(), $stat);
 
         return $stat;
     }
@@ -49,7 +53,11 @@ class StreamHandler extends AbstractStreamHandlerDecorator
      */
     public function urlStat(string $path, int $flags): array|false
     {
-        $stat = Antilag::getCachedStat($path);
+        if (!Ignition::isChokeOn()) {
+            return parent::urlStat($path, $flags);
+        }
+
+        $stat = Ignition::getCachedStat($path);
 
         if ($stat !== null) {
             return $stat;
@@ -57,7 +65,7 @@ class StreamHandler extends AbstractStreamHandlerDecorator
 
         $stat = parent::urlStat($path, $flags);
 
-        Antilag::cacheStat($path, $stat);
+        Ignition::cacheStat($path, $stat);
 
         return $stat;
     }

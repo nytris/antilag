@@ -19,10 +19,11 @@ use Nytris\Antilag\Antilag;
 use Nytris\Antilag\AntilagPackage;
 use Nytris\Antilag\Launch;
 use Nytris\Antilag\Stage;
-use Nytris\Antilag\StorageInterface;
 use Nytris\Antilag\Tests\Functional\AbstractFunctionalTestCase;
 use Nytris\Boot\BootConfig;
 use Nytris\Boot\PlatformConfig;
+use Nytris\Ignition\Ignition;
+use Nytris\Ignition\Storage\StorageInterface;
 use Nytris\Nytris;
 
 /**
@@ -65,6 +66,7 @@ class StreamHandlerTest extends AbstractFunctionalTestCase
         Shift::uninstall();
         Launch::uninstall();
         Nytris::uninitialise();
+        Ignition::switchOff();
 
         $this->rimrafDescendantsOf($this->varPath);
     }
@@ -76,7 +78,11 @@ class StreamHandlerTest extends AbstractFunctionalTestCase
             ->andReturn([
                 __FILE__ => ['size' => 4321],
             ]);
-        Antilag::stage1(storage: $this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__, 2) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
         Nytris::boot($this->bootConfig);
 
         $stream = fopen(__FILE__, 'rb');
@@ -88,7 +94,11 @@ class StreamHandlerTest extends AbstractFunctionalTestCase
 
     public function testStage2ReadsFromStatCacheForUrlStats(): void
     {
-        Antilag::stage1(storage: $this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__, 2) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
         Nytris::boot($this->bootConfig);
 
         $stat = stat('/my/first/path');
@@ -99,7 +109,11 @@ class StreamHandlerTest extends AbstractFunctionalTestCase
 
     public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperStreamStat(): void
     {
-        Antilag::stage1(storage: $this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__, 2) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
         Nytris::boot($this->bootConfig);
         $stream = fopen(__FILE__, 'rb');
 
@@ -119,7 +133,11 @@ class StreamHandlerTest extends AbstractFunctionalTestCase
 
     public function testStage3StoresNewlyCachedStatsFromStage1StreamWrapperUrlStat(): void
     {
-        Antilag::stage1(storage: $this->storage);
+        Ignition::start(
+            rootProjectPath: dirname(__DIR__, 2) . '/Fixtures/Direct/WithAutoHandoffDisablingPreflight',
+            storage: $this->storage
+        );
+        Antilag::stage1();
         Nytris::boot($this->bootConfig);
 
         $this->storage->expects('saveStatCache')
