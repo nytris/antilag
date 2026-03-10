@@ -5,8 +5,7 @@
     "autoload": {
         "psr-4": {
             "Nytris\\Antilag\\": "src/"
-        },
-        "classmap": ["src/AntilagPreflight.php", "src/Stage.php"]
+        }
     },
     "autoload-dev": {
         "psr-4": {
